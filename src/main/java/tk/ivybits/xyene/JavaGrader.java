@@ -15,18 +15,20 @@ import java.util.List;
 
 /**
  * Sketchy Swing UI to help grading student assignments.
+ *
+ * @author Tudor Brindus (Xyene)
  */
 public class JavaGrader extends JFrame {
-
     public JavaGrader() {
         super("Java Grader");
 
         JTabbedPane tabs = new JTabbedPane();
         JTextPane output = new JTextPane();
         JTextPane code = new JTextPane();
-        output.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        Font monoFont = new Font(Font.MONOSPACED, Font.PLAIN, 14);
+        output.setFont(monoFont);
         output.setEditable(false);
-        code.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        code.setFont(monoFont);
         code.setEditable(false);
 
         JTextField input = new JTextField();
@@ -38,7 +40,7 @@ public class JavaGrader extends JFrame {
         tabs.addTab("IO", IO);
         tabs.addTab("Source", new JScrollPane(code));
 
-        final JLabel drop = new JLabel("<html><b>Drop file to run here!</b><html>", JLabel.CENTER);
+        JLabel drop = new JLabel("<html><b>Drop file to run here!</b><html>", JLabel.CENTER);
 
         setLayout(new BorderLayout());
 
@@ -60,7 +62,7 @@ public class JavaGrader extends JFrame {
                         try {
                             spawnAltJVM(path, output, input);
                         } catch (Exception e) {
-
+                            e.printStackTrace();
                         }
                     }).start();
                     code.setText(new String(Files.readAllBytes(path.toPath()), StandardCharsets.UTF_8));
@@ -78,10 +80,14 @@ public class JavaGrader extends JFrame {
     public static void spawnAltJVM(File cp, JTextPane out, JTextField in) throws IOException, InterruptedException, ClassNotFoundException {
         System.out.println("Using agent " + cp);
 
-        new ProcessBuilder(
+        Process compiler = new ProcessBuilder(
                 System.getProperty("jdk.home") + File.separator + "bin" + File.separator + "javac",
                 cp.getName()
-        ).directory(cp.getParentFile()).inheritIO().start().waitFor();
+        ).directory(cp.getParentFile()).start();
+        redirectOutput(out, compiler.getInputStream());
+        redirectOutput(out, compiler.getErrorStream());
+
+        compiler.waitFor();
 
         ProcessBuilder processBuilder = new ProcessBuilder(
                 System.getProperty("java.home") + File.separator + "bin" + File.separator + "java",
@@ -93,6 +99,7 @@ public class JavaGrader extends JFrame {
         ).directory(cp.getParentFile());
 
         Process applet = processBuilder.start();
+
         redirectOutput(out, applet.getInputStream());
         redirectOutput(out, applet.getErrorStream());
         PrintStream to = new PrintStream(applet.getOutputStream());
@@ -123,13 +130,7 @@ public class JavaGrader extends JFrame {
                 int len;
                 while ((len = in.read(buffer)) != -1) {
                     final int _len = len;
-                    SwingUtilities.invokeAndWait(() -> {
-                        try {
-                            out.setText(out.getText() + new String(buffer, 0, _len, StandardCharsets.US_ASCII));
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    });
+                    SwingUtilities.invokeAndWait(() -> out.setText(out.getText() + new String(buffer, 0, _len, StandardCharsets.US_ASCII)));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
